@@ -233,6 +233,26 @@ For detailed testing strategy, see [docs/testing.md](docs/testing.md).
 
 See [docs/testing.md](docs/testing.md) and [docs/security.md](docs/security.md) for details.
 
+## Screenshots
+
+### API Documentation (Swagger UI)
+![Swagger UI](docs/screenshots/swagger.png)
+
+### Create Shortened URL
+![Create URL](docs/screenshots/create-url.png)
+
+### URL Redirect
+![Redirect](docs/screenshots/redirect.png)
+
+### Click Analytics
+![Analytics](docs/screenshots/analytics.png)
+
+### Test Results
+![Tests](docs/screenshots/tests.png)
+
+### Docker Deployment
+![Docker](docs/screenshots/docker.png)
+
 ## Interview Demonstration
 
 1. **Show Swagger UI** — http://localhost:8080/swagger-ui.html (interactive API docs)
