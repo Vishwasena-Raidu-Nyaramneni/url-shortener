@@ -30,6 +30,18 @@ public class UrlValidator {
                 return false;
             }
 
+            // Check for embedded credentials (user:password@host)
+            String userInfo = url.getUserInfo();
+            if (userInfo != null && !userInfo.isEmpty()) {
+                return false;
+            }
+
+            // Check for path traversal attempts
+            String path = url.getPath();
+            if (path != null && path.contains("..")) {
+                return false;
+            }
+
             // Parse as URI to ensure valid format
             new URI(urlString);
             return true;

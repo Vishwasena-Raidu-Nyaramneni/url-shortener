@@ -4,6 +4,8 @@ import com.vishwasena.urlshortener.dto.AnalyticsResponse;
 import com.vishwasena.urlshortener.dto.CreateUrlRequest;
 import com.vishwasena.urlshortener.dto.CreateUrlResponse;
 import com.vishwasena.urlshortener.entity.ShortUrl;
+import com.vishwasena.urlshortener.exception.UrlAlreadyExistsException;
+import com.vishwasena.urlshortener.exception.UrlNotFoundException;
 import com.vishwasena.urlshortener.service.UrlShortenerService;
 import com.vishwasena.urlshortener.util.ClientIpExtractor;
 import jakarta.servlet.http.HttpServletRequest;
@@ -27,21 +29,46 @@ public class UrlController {
 
     @PostMapping("/api/v1/urls")
     public ResponseEntity<CreateUrlResponse> createShortUrl(@Valid @RequestBody CreateUrlRequest request) {
-        ShortUrl shortUrl = urlShortenerService.createShortUrl(request.getOriginalUrl(), request.getExpiresAt());
+        try {
+            ShortUrl shortUrl = urlShortenerService.createShortUrl(request.getOriginalUrl(), request.getExpiresAt());
 
-        String shortUrlFull = baseUrl + "/" + shortUrl.getShortCode();
-        CreateUrlResponse response = new CreateUrlResponse(
-                shortUrl.getId(),
-                shortUrl.getShortCode(),
-                shortUrl.getOriginalUrl(),
-                shortUrlFull
-        );
+            String shortUrlFull = baseUrl + "/" + shortUrl.getShortCode();
+            CreateUrlResponse response = new CreateUrlResponse(
+                    shortUrl.getId(),
+                    shortUrl.getShortCode(),
+                    shortUrl.getOriginalUrl(),
+                    shortUrlFull
+            );
 
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+            // New URL created - return 201 CREATED
+            return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        } catch (UrlAlreadyExistsException ex) {
+            // URL already exists - return 200 OK with existing URL details
+            // Extract short code from exception message
+            String message = ex.getMessage();
+            String shortCode = message.substring(message.lastIndexOf(": ") + 2);
+            
+            ShortUrl existingUrl = urlShortenerService.getShortUrlByCode(shortCode);
+            String shortUrlFull = baseUrl + "/" + shortCode;
+            CreateUrlResponse response = new CreateUrlResponse(
+                    existingUrl.getId(),
+                    shortCode,
+                    existingUrl.getOriginalUrl(),
+                    shortUrlFull
+            );
+
+            // Existing URL returned - return 200 OK
+            return ResponseEntity.status(HttpStatus.OK).body(response);
+        }
     }
 
     @GetMapping("/{shortCode}")
     public RedirectView redirect(@PathVariable String shortCode, HttpServletRequest request) {
+        // Validate short code is not empty
+        if (shortCode == null || shortCode.trim().isEmpty()) {
+            throw new UrlNotFoundException("Short code is required");
+        }
+
         // Record click before redirecting
         String clientIp = ClientIpExtractor.extractClientIp(request);
         String userAgent = request.getHeader("User-Agent");
@@ -82,3 +109,4 @@ public class UrlController {
         return ResponseEntity.ok(response);
     }
 }
+

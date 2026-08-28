@@ -4,12 +4,15 @@ import com.vishwasena.urlshortener.entity.ClickEvent;
 import com.vishwasena.urlshortener.entity.ShortUrl;
 import com.vishwasena.urlshortener.exception.DisabledUrlException;
 import com.vishwasena.urlshortener.exception.ExpiredUrlException;
+import com.vishwasena.urlshortener.exception.UrlAlreadyExistsException;
 import com.vishwasena.urlshortener.exception.UrlNotFoundException;
 import com.vishwasena.urlshortener.repository.ClickEventRepository;
 import com.vishwasena.urlshortener.repository.ShortUrlRepository;
 import com.vishwasena.urlshortener.util.IpHasher;
 import com.vishwasena.urlshortener.util.ShortCodeGenerator;
 import com.vishwasena.urlshortener.util.UrlValidator;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,6 +39,12 @@ public class UrlShortenerService {
             throw new IllegalArgumentException("Invalid URL: " + originalUrl);
         }
 
+        // Deduplication: check if same URL + same expiration already exists
+        var existing = shortUrlRepository.findByOriginalUrlAndExpiresAt(originalUrl, expiresAt);
+        if (existing.isPresent()) {
+            throw new UrlAlreadyExistsException("URL with this configuration already exists. Short code: " + existing.get().getShortCode());
+        }
+
         // Create short URL with collision retry
         ShortUrl shortUrl = null;
         for (int attempt = 0; attempt < MAX_COLLISION_RETRIES; attempt++) {
@@ -57,6 +66,7 @@ public class UrlShortenerService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(value = "short_urls", key = "#shortCode")
     public ShortUrl getShortUrlByCode(String shortCode) {
         ShortUrl shortUrl = shortUrlRepository.findByShortCode(shortCode)
                 .orElseThrow(() -> new UrlNotFoundException(shortCode));
@@ -116,6 +126,7 @@ public class UrlShortenerService {
         );
     }
 
+    @CacheEvict(value = "short_urls", key = "#id.toString()")
     public void disableShortUrl(Long id) {
         ShortUrl shortUrl = shortUrlRepository.findById(id)
                 .orElseThrow(() -> new UrlNotFoundException("ID: " + id));

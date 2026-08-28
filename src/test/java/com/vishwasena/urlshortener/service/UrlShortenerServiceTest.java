@@ -12,6 +12,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.time.OffsetDateTime;
 import java.util.Optional;
@@ -107,5 +108,33 @@ class UrlShortenerServiceTest {
 
         service.disableShortUrl(1L);
         assertEquals("DISABLED", url.getStatus());
+    }
+
+    @Test
+    void testCreateShortUrlCollisionRetrySuccess() {
+        when(shortUrlRepository.save(any(ShortUrl.class)))
+                .thenThrow(new DataIntegrityViolationException("Duplicate key", new RuntimeException()))
+                .thenThrow(new DataIntegrityViolationException("Duplicate key", new RuntimeException()))
+                .thenAnswer(invocation -> {
+                    ShortUrl url = invocation.getArgument(0);
+                    url.setId(1L);
+                    return url;
+                });
+
+        ShortUrl result = service.createShortUrl("https://example.com", null);
+
+        assertNotNull(result);
+        assertEquals("https://example.com", result.getOriginalUrl());
+        assertEquals("ACTIVE", result.getStatus());
+    }
+
+    @Test
+    void testCreateShortUrlCollisionFailureAllRetries() {
+        when(shortUrlRepository.save(any(ShortUrl.class)))
+                .thenThrow(new DataIntegrityViolationException("Duplicate key", new RuntimeException()));
+
+        assertThrows(RuntimeException.class, () -> {
+            service.createShortUrl("https://example.com", null);
+        });
     }
 }

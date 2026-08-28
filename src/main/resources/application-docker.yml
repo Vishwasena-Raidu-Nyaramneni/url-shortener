@@ -13,9 +13,9 @@ spring:
         order_inserts: true
         order_updates: true
   datasource:
-    url: jdbc:postgresql://localhost:5432/url_shortener
-    username: postgres
-    password: postgres
+    url: jdbc:postgresql://${SPRING_DATASOURCE_URL:localhost:5432/url_shortener}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
   flyway:
     enabled: true
@@ -28,12 +28,13 @@ spring:
       spec: "maximumSize=100000,expireAfterWrite=5m"
 
 app:
-  base-url: http://localhost:8080
+  base-url: ${APP_BASE_URL:http://localhost:8080}
 
 server:
   port: 8080
   servlet:
     context-path: /
+  shutdown: graceful
   error:
     include-message: always
     include-stacktrace: never
@@ -59,7 +60,7 @@ management:
 logging:
   level:
     root: INFO
-    com.vishwasena.urlshortener: DEBUG
+    com.vishwasena.urlshortener: INFO
     org.springframework.web: INFO
-    org.hibernate.SQL: DEBUG
-    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    org.hibernate.SQL: INFO
+    org.hibernate.type.descriptor.sql.BasicBinder: INFO

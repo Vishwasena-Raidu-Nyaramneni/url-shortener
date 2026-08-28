@@ -12,6 +12,11 @@ class UrlValidatorTest {
     }
 
     @Test
+    void testValidHttpUrlWithPath() {
+        assertTrue(UrlValidator.isValidUrl("http://example.com/path/to/resource"));
+    }
+
+    @Test
     void testValidHttpsUrl() {
         assertTrue(UrlValidator.isValidUrl("https://example.com/path"));
     }

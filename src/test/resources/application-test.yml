@@ -17,6 +17,10 @@ spring:
     enabled: false
   jackson:
     property-naming-strategy: SNAKE_CASE
+  cache:
+    type: caffeine
+    caffeine:
+      spec: "maximumSize=100000,expireAfterWrite=5m"
 
 app:
   base-url: http://localhost:8080
