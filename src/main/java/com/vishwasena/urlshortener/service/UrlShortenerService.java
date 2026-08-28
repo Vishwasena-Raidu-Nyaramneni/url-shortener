@@ -18,7 +18,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
-import java.util.List;
 
 @Service
 @Transactional
@@ -90,6 +89,7 @@ public class UrlShortenerService {
                 .orElseThrow(() -> new UrlNotFoundException("ID: " + id));
     }
 
+    @Transactional
     public void recordClick(String shortCode, String ipAddress, String userAgent, String referer) {
         ShortUrl shortUrl = getShortUrlByCode(shortCode);
 
@@ -98,7 +98,7 @@ public class UrlShortenerService {
         ClickEvent clickEvent = new ClickEvent(shortUrl, ipHash, userAgent, referer);
         clickEventRepository.save(clickEvent);
 
-        // Increment click count
+        // Increment click count (note: non-atomic, suitable for MVP; future optimization could use atomic SQL UPDATE)
         shortUrl.incrementClickCount();
         shortUrlRepository.save(shortUrl);
     }
@@ -108,14 +108,8 @@ public class UrlShortenerService {
         ShortUrl shortUrl = shortUrlRepository.findById(shortUrlId)
                 .orElseThrow(() -> new UrlNotFoundException("ID: " + shortUrlId));
 
-        List<ClickEvent> clickEvents = clickEventRepository.findByShortUrlId(shortUrlId);
         long uniqueVisitors = clickEventRepository.countUniqueVisitors(shortUrlId);
-
-        OffsetDateTime lastClickedAt = clickEvents.isEmpty() ? null : 
-                clickEvents.stream()
-                        .map(ClickEvent::getClickedAt)
-                        .max(OffsetDateTime::compareTo)
-                        .orElse(null);
+        OffsetDateTime lastClickedAt = clickEventRepository.getLastClickedAt(shortUrlId);
 
         return new AnalyticsData(
                 shortUrl.getId(),

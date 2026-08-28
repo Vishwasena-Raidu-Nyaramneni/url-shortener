@@ -13,9 +13,9 @@ spring:
         order_inserts: true
         order_updates: true
   datasource:
-    url: jdbc:postgresql://localhost:5432/url_shortener
-    username: postgres
-    password: postgres
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/url_shortener
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
   flyway:
     enabled: true
