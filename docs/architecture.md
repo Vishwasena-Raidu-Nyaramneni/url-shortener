@@ -1,123 +1,202 @@
-﻿# URL Shortener — Architecture
+# Architecture
 
-## 1. Architecture Overview
+## 1. Overview
 
-The URL Shortener is a **modular monolith** using a layered architecture appropriate for an interview prototype. The design prioritizes simplicity, maintainability, and clear separation of concerns over premature architectural complexity (microservices, distributed caching, message queues).
+The URL Shortener is a **modular monolith** using a layered architecture:
 
-**Why this architecture?**
+**Why this design?**
+- Simplicity: Single Spring Boot application, easy to test and deploy
+- Clear separation: controller → service → repository → database
+- No distributed system complexity (no CAP theorem, clock skew)
+- Interview-appropriate: Production-quality code without over-engineering
+- Scalable: Can refactor to microservices if traffic requires
 
-- **Simplicity:** Easier to develop, test, and deploy in a single Spring Boot application
-- **No distributed system complexity:** Avoids CAP theorem concerns, clock skew, eventual consistency issues
-- **Clear dependencies:** Explicit flow from controller → service → repository → database
-- **Interview-appropriate scope:** Demonstrates production-quality code without over-engineering
-- **No premature optimization:** Monolith scales adequately for prototype traffic; can be refactored to microservices if needed
+## 2. Layers & Responsibilities
 
-The service is deployed as a single JAR file running on Spring Boot, backed by PostgreSQL. All components run in the same JVM process.
-
-## 2. Architecture Diagram
-
-`mermaid
-graph LR
-    Client["HTTP Client<br/>(Browser, API Client)"]
-    
-    subgraph Spring["Spring Boot Application"]
-        DispatcherServlet["Dispatcher Servlet<br/>(Spring MVC)"]
-        Controller["UrlController<br/>(REST Endpoints)"]
-        Validation["Request Validation<br/>(@Valid, Bean Validation)"]
-        Service["UrlShortenerService<br/>(Business Logic)"]
-        Util["Utility Classes<br/>(IpHasher, ShortCodeGenerator,<br/>UrlValidator, ClientIpExtractor)"]
-        Repository["Repository Layer<br/>(JPA Repositories)"]
-        Entity["Entity Classes<br/>(JPA Entities)"]
-    end
-    
-    Flyway["Flyway<br/>(Database Migrations)"]
-    Database["PostgreSQL<br/>(Persistent Storage)"]
-    
-    Actuator["Spring Actuator<br/>(/actuator/health)"]
-    
-    Client -->|HTTP| DispatcherServlet
-    DispatcherServlet -->|Routes| Controller
-    Controller -->|Validates| Validation
-    Validation -->|Valid Request| Service
-    Service -->|Uses| Util
-    Service -->|Reads/Writes| Repository
-    Repository -->|ORM Mapping| Entity
-    Entity -->|SQL| Database
-    
-    Flyway -->|Migrations| Database
-    Client -->|GET /actuator/health| Actuator
-    
-    style Spring fill:#e8f4f8
-    style Database fill:#ffe8e8
-    style Client fill:#e8ffe8
+| Layer | Components | Responsibility |
+|-------|-----------|-----------------|
+| **Controller** | UrlController | HTTP request routing, parameter extraction, status codes |
+| **Service** | UrlShortenerService | Business logic, orchestration, transaction boundaries |
+| **Repository** | ShortUrlRepository, ClickEventRepository | Database queries via Spring Data JPA |
+| **Entity** | ShortUrl, ClickEvent | JPA entity definitions and lifecycle hooks |
+| **Utility** | IpHasher, ShortCodeGenerator, UrlValidator, ClientIpExtractor | Stateless utility functions |
+| **Exception** | GlobalExceptionHandler, domain exceptions | Centralized error handling |
 
 ## 3. Technology Stack
 
-| Component | Technology | Version | Purpose |
-|-----------|-----------|---------|---------|
-| **Language** | Java | 21 (LTS) | Primary development language |
-| **Framework** | Spring Boot | 3.3.0 | Application framework & web server |
-| **Web** | Spring Web MVC | 3.3.0 | REST API & HTTP handling |
-| **ORM** | Spring Data JPA | 3.3.0 | Database abstraction layer |
-| **Validation** | Bean Validation (Jakarta) | 3.0 | Request & entity validation |
-| **Database** | PostgreSQL | Latest (via driver) | Persistent data storage |
-| **Driver** | org.postgresql | Latest | PostgreSQL JDBC driver |
-| **Migrations** | Flyway | Latest | Database schema versioning |
-| **Monitoring** | Spring Actuator | 3.3.0 | Health & operational endpoints |
-| **API Docs** | Springdoc OpenAPI | 2.3.0 | Swagger/OpenAPI documentation |
-| **Testing** | JUnit 5 | Latest | Unit testing framework |
-| **Mocking** | Mockito | Latest | Mock object framework |
-| **Integration Tests** | Testcontainers | 1.19.3 | PostgreSQL containers (future) |
-| **Build** | Maven | 3.x | Build & dependency management |
+| Component | Technology | Purpose |
+|-----------|-----------|---------|
+| Language | Java 21 (LTS) | Primary development language |
+| Framework | Spring Boot 3.3.0 | Application framework & servlet container |
+| Web | Spring Web MVC | REST API & HTTP handling |
+| Persistence | Spring Data JPA | ORM & data access abstraction |
+| Database | PostgreSQL 15+ | Persistent data storage |
+| Validation | Jakarta Bean Validation | Request & entity validation |
+| Migrations | Flyway | Database schema versioning |
+| API Docs | Springdoc OpenAPI 2.3.0 | Swagger/OpenAPI documentation |
+| Testing | JUnit 5, Mockito, Testcontainers | Unit & integration testing |
+| Build | Maven 3.x | Build & dependency management |
 
-**Build Configuration:**
-- Java source/target: 21
-- Project encoding: UTF-8
-- Maven Compiler source/target: 21
+## 4. Request Flows
 
-## 4. Package Structure
+### Create Short URL
+```
+POST /api/v1/urls → UrlController
+  ↓ Validate @Valid
+  ↓ UrlShortenerService.createShortUrl()
+  ├─ UrlValidator.isValidUrl() [scheme whitelist, length check]
+  ├─ Retry loop (max 5 attempts):
+  │  ├─ ShortCodeGenerator.generate() [SecureRandom Base62]
+  │  ├─ ShortUrlRepository.save() [unique constraint enforced]
+  │  └─ On DataIntegrityViolationException: retry
+  ↓ Return HTTP 201 (Created) with CreateUrlResponse
+```
 
-`
-com.vishwasena.urlshortener
-├── controller/
-│   └── UrlController.java         # REST endpoints & HTTP handling
-├── service/
-│   └── UrlShortenerService.java   # Business logic & orchestration
-├── repository/
-│   ├── ShortUrlRepository.java    # Data access for ShortUrl
-│   └── ClickEventRepository.java  # Data access for ClickEvent
-├── entity/
-│   ├── ShortUrl.java              # JPA entity for short_url table
-│   └── ClickEvent.java            # JPA entity for click_event table
-├── dto/
-│   ├── CreateUrlRequest.java      # Request DTO
-│   ├── CreateUrlResponse.java     # Response DTO
-│   ├── AnalyticsResponse.java     # Analytics DTO
-│   └── ErrorResponse.java         # Error DTO
-├── exception/
-│   ├── GlobalExceptionHandler.java  # Centralized exception handling
-│   ├── UrlNotFoundException.java     # Custom exception
-│   ├── ExpiredUrlException.java     # Custom exception
-│   └── DisabledUrlException.java    # Custom exception
-├── util/
-│   ├── ShortCodeGenerator.java    # Base62 short code generation
-│   ├── UrlValidator.java          # URL scheme/format validation
-│   ├── IpHasher.java              # SHA-256 IP hashing
-│   └── ClientIpExtractor.java     # Extract client IP from headers
-├── config/
-│   └── (Empty; Spring Boot auto-configuration used)
-└── UrlShortenerApplication.java   # Spring Boot entry point
-`
+**Key Decision:** Max 5 collision retries; after 5 fails, return HTTP 500. With 62^8 ≈ 218 trillion combinations, collision is extremely rare; 5 retries provides safety while keeping code simple.
 
-**Package Responsibilities:**
+### Redirect & Click Recording
+```
+GET /{shortCode} → UrlController
+  ↓ Extract client IP, User-Agent, Referer
+  ↓ UrlShortenerService.recordClick()
+  ├─ getShortUrlByCode() [indexed lookup]
+  ├─ Check expiration & disabled status (throw 410 if true)
+  ├─ IpHasher.hashIp() [SHA-256 one-way]
+  ├─ ClickEventRepository.save() [insert click event]
+  ├─ Increment click_count
+  ↓ Return HTTP 302 (Found) with Location header
+```
 
-- **controller:** HTTP request/response handling, parameter extraction, status codes
-- **service:** Business logic, validation orchestration, transaction management
-- **repository:** Database queries using Spring Data JPA conventions
-- **entity:** JPA entity definitions and lifecycle hooks
-- **dto:** Request/response data transfer objects (decouples API from entities)
-- **exception:** Domain exceptions and centralized error handling
-- **util:** Stateless utility functions (IP extraction, hashing, validation)
+**Key Decision:** Synchronous click recording ensures accuracy; defers availability vs consistency trade-off. At scale, consider async via message queue.
+
+### Analytics Retrieval
+```
+GET /api/v1/urls/{id}/analytics → UrlController
+  ↓ UrlShortenerService.getAnalytics()
+  ├─ Query ShortUrl by ID
+  ├─ COUNT(DISTINCT ip_hash) from click_events
+  ├─ Calculate MAX(clicked_at) timestamp
+  ↓ Return HTTP 200 (OK) with AnalyticsResponse
+```
+
+**Known Issue:** Loads all ClickEvent objects into memory to find MAX(clicked_at). For high-volume URLs, use native SQL aggregate instead.
+
+## 5. Database Schema
+
+**short_url table** (Stores URL mappings)
+
+| Column | Type | Key | Purpose |
+|--------|------|-----|---------|
+| id | BIGSERIAL | PK | Auto-increment ID |
+| short_code | VARCHAR(20) | UNIQUE | Base62 redirect key |
+| original_url | TEXT | — | Destination URL |
+| status | VARCHAR(20) | — | ACTIVE or DISABLED |
+| created_at, updated_at | TIMESTAMP TZ | — | Managed by @PrePersist/@PreUpdate |
+| expires_at | TIMESTAMP TZ | — | Optional expiration (nullable) |
+| click_count | BIGINT | — | Total clicks (incremented on redirect) |
+
+**Indexes:** UNIQUE idx_short_code (redirect lookup), idx_status, idx_expires_at
+
+**click_event table** (Stores click activity)
+
+| Column | Type | Key | Purpose |
+|--------|------|-----|---------|
+| id | BIGSERIAL | PK | Auto-increment click ID |
+| short_url_id | BIGINT | FK | Reference to short_url |
+| clicked_at | TIMESTAMP TZ | — | Click timestamp |
+| ip_hash | VARCHAR(64) | — | SHA-256 hash (no raw IPs) |
+| user_agent | TEXT | — | HTTP User-Agent |
+| referer | TEXT | — | HTTP Referer |
+
+**Foreign Key:** ON DELETE CASCADE (deleting URL deletes clicks)
+
+**Relationship:** One ShortUrl → Many ClickEvents
+
+## 6. Transactions & Consistency
+
+**@Transactional Methods:**
+
+| Method | Scope | Read-Only | Guarantees |
+|--------|-------|-----------|-----------|
+| createShortUrl() | REQUIRED | No | Atomicity: create short code, persist, or fail entirely |
+| recordClick() | REQUIRED | No | Atomicity: insert click + update click_count in same transaction |
+| getAnalytics() | REQUIRED | Yes | Read consistency (database snapshot) |
+| disableShortUrl() | REQUIRED | No | Atomicity: update status field |
+
+**Why:** ACID guarantees ensure click_count never falls out of sync with ClickEvent rows, even under concurrent requests.
+
+## 7. Error Handling
+
+**GlobalExceptionHandler catches and maps exceptions to HTTP:**
+
+| Exception | HTTP Status | Rationale |
+|-----------|-------------|-----------|
+| UrlNotFoundException | 404 Not Found | Short code doesn't exist |
+| ExpiredUrlException | 410 Gone | URL expired (distinct from 404) |
+| DisabledUrlException | 410 Gone | URL disabled (distinct from 404) |
+| IllegalArgumentException | 400 Bad Request | Invalid URL format/scheme |
+| MethodArgumentNotValidException | 400 Bad Request | Bean Validation failure |
+| Exception (generic) | 500 Internal Error | Unexpected error (logged, no stack trace exposed) |
+
+**Error Response Format:**
+```json
+{ "code": 400, "message": "Invalid URL: javascript:alert('xss')" }
+```
+
+**Key: No exception details in responses.** Stack traces logged server-side only (ERROR level).
+
+## 8. Security
+
+### Implemented Controls
+
+| Control | Implementation | Status |
+|---------|-----------------|--------|
+| **URL Scheme Validation** | Whitelist HTTP/HTTPS; reject data:, javascript:, file:, ftp: | ✅ |
+| **Input Validation** | @NotBlank, @Size, format validation via java.net.URL | ✅ |
+| **IP Privacy** | One-way SHA-256 hash; no raw IP storage in database | ✅ |
+| **SQL Injection Prevention** | Parameterized queries via Spring Data JPA | ✅ |
+| **Exception Leakage** | Generic error messages; stack traces not exposed | ✅ |
+| **SSRF Prevention** | No server-side URL fetching | ✅ |
+
+### Known Risks
+
+| Risk | Severity | Mitigation |
+|------|----------|-----------|
+| Hardcoded database credentials in application.yml | HIGH | Use environment variables in production |
+| IP header spoofing (X-Forwarded-For without validation) | MEDIUM | Configure proxy trust in production |
+| No rate limiting | MEDIUM | Add per-IP/API-key throttling (future) |
+| Public endpoints (no authentication) | MEDIUM | Add API keys or OAuth2 (future) |
+
+## 9. Scalability Bottlenecks
+
+| Bottleneck | Current Impact | Solution |
+|------------|-----------------|----------|
+| **Synchronous click recording** | Each redirect must insert + update before returning 302 | Async via message queue (Kafka) |
+| **In-memory analytics** | Loads all ClickEvent objects to find MAX(clicked_at) | Native SQL aggregate query |
+| **No caching** | Every redirect queries database | Redis cache for frequently accessed URLs |
+| **Single service instance** | One failure = complete outage | Load balancer + multiple instances |
+| **Unbounded analytics growth** | click_event table grows indefinitely | Retention policy + archival |
+
+**Current Adequate For:** Thousands of redirects/sec, millions of total URLs, interview prototype
+
+**Scaling Path:** Add caching → async click recording → read replicas → event-driven microservices
+
+## 10. Architectural Decisions
+
+| Decision | Why Not Alternative |
+|----------|---------------------|
+| Monolith (not microservices) | Simpler to develop/test; no RPC latency or consistency issues; refactor later if needed |
+| No Redis | Adds operational complexity; database caching usually sufficient for MVP |
+| No Kafka | Synchronous click recording simpler; async is future enhancement |
+| No Kubernetes | Single server/load balancer adequate; K8s overhead not justified |
+| No GraphQL | REST sufficient for simple CRUD; GraphQL complexity not warranted |
+| No frontend | Assignment is API-only; separate concern |
+
+## Summary
+
+Clean, layered Spring Boot monolith with clear separation of concerns. Designed for correctness and maintainability first, with explicit path to scalability through async processing, caching, and eventual service decomposition as traffic grows.
+
+See [docs/requirements.md](requirements.md) for feature details, [docs/security.md](security.md) for threat analysis, [docs/testing.md](testing.md) for validation approach.
 
 ## 5. Create URL Request Flow
 
