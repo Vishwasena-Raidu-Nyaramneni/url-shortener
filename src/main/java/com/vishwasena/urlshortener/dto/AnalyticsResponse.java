@@ -1,22 +1,29 @@
 package com.vishwasena.urlshortener.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.OffsetDateTime;
 
+@Schema(description = "Analytics data for a short URL")
 public class AnalyticsResponse {
+    @Schema(description = "Database ID of the short URL", example = "123")
     @JsonProperty("short_url_id")
     private Long shortUrlId;
 
+    @Schema(description = "Unique short code", example = "abc123de")
     @JsonProperty("short_code")
     private String shortCode;
 
+    @Schema(description = "Total number of clicks on this short URL", example = "42")
     @JsonProperty("total_clicks")
     private Long totalClicks;
 
+    @Schema(description = "Number of unique visitors (based on IP hash)", example = "15")
     @JsonProperty("unique_visitors")
     private Long uniqueVisitors;
 
+    @Schema(description = "Timestamp of the last click in ISO-8601 format", example = "2024-08-28T14:30:45Z")
     @JsonProperty("last_clicked_at")
     private OffsetDateTime lastClickedAt;
 

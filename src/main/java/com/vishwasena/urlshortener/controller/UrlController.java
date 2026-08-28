@@ -8,6 +8,11 @@ import com.vishwasena.urlshortener.exception.UrlAlreadyExistsException;
 import com.vishwasena.urlshortener.exception.UrlNotFoundException;
 import com.vishwasena.urlshortener.service.UrlShortenerService;
 import com.vishwasena.urlshortener.util.ClientIpExtractor;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Value;
@@ -18,6 +23,7 @@ import org.springframework.web.servlet.view.RedirectView;
 
 @RestController
 @RequestMapping
+@Tag(name = "URL Management", description = "Create, redirect, and manage short URLs with analytics")
 public class UrlController {
     private final UrlShortenerService urlShortenerService;
     private final String baseUrl;
@@ -28,6 +34,17 @@ public class UrlController {
     }
 
     @PostMapping("/api/v1/urls")
+    @Operation(
+        summary = "Create a short URL",
+        description = "Creates a new short URL for the provided original URL, or returns the existing short URL if the URL has already been shortened",
+        tags = {"URL Management"}
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "201", description = "Short URL created successfully"),
+        @ApiResponse(responseCode = "200", description = "Short URL already exists for this URL"),
+        @ApiResponse(responseCode = "400", description = "Invalid input - URL validation failed"),
+        @ApiResponse(responseCode = "409", description = "URL conflict")
+    })
     public ResponseEntity<CreateUrlResponse> createShortUrl(@Valid @RequestBody CreateUrlRequest request) {
         try {
             ShortUrl shortUrl = urlShortenerService.createShortUrl(request.getOriginalUrl(), request.getExpiresAt());
@@ -63,6 +80,16 @@ public class UrlController {
     }
 
     @GetMapping("/{shortCode}")
+    @Operation(
+        summary = "Redirect to original URL",
+        description = "Redirects to the original URL for the provided short code and records click analytics",
+        tags = {"URL Management"}
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "302", description = "Redirect to original URL"),
+        @ApiResponse(responseCode = "404", description = "Short code not found"),
+        @ApiResponse(responseCode = "410", description = "Short URL has expired or is disabled")
+    })
     public RedirectView redirect(@PathVariable String shortCode, HttpServletRequest request) {
         // Validate short code is not empty
         if (shortCode == null || shortCode.trim().isEmpty()) {
@@ -85,18 +112,46 @@ public class UrlController {
     }
 
     @GetMapping("/api/v1/urls/{id}")
+    @Operation(
+        summary = "Get short URL details",
+        description = "Retrieves detailed information about a short URL by its ID",
+        tags = {"URL Management"}
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Short URL details retrieved successfully"),
+        @ApiResponse(responseCode = "404", description = "Short URL not found")
+    })
     public ResponseEntity<ShortUrl> getShortUrl(@PathVariable Long id) {
         ShortUrl shortUrl = urlShortenerService.getShortUrlById(id);
         return ResponseEntity.ok(shortUrl);
     }
 
     @DeleteMapping("/api/v1/urls/{id}")
+    @Operation(
+        summary = "Disable short URL",
+        description = "Disables a short URL, preventing further redirects",
+        tags = {"URL Management"}
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "204", description = "Short URL disabled successfully"),
+        @ApiResponse(responseCode = "404", description = "Short URL not found")
+    })
     public ResponseEntity<Void> disableShortUrl(@PathVariable Long id) {
         urlShortenerService.disableShortUrl(id);
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/api/v1/urls/{id}/analytics")
+    @Operation(
+        summary = "Get analytics data",
+        description = "Retrieves analytics data for a short URL including total clicks, unique visitors, and last click timestamp",
+        tags = {"URL Management"}
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Analytics data retrieved successfully"),
+        @ApiResponse(responseCode = "404", description = "Short URL not found"),
+        @ApiResponse(responseCode = "410", description = "Short URL has expired or is disabled")
+    })
     public ResponseEntity<AnalyticsResponse> getAnalytics(@PathVariable Long id) {
         UrlShortenerService.AnalyticsData data = urlShortenerService.getAnalytics(id);
         AnalyticsResponse response = new AnalyticsResponse(

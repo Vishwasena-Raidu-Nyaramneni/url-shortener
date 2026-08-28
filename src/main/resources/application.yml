@@ -56,6 +56,15 @@ management:
     health:
       show-details: when-authorized
 
+springdoc:
+  api-docs:
+    path: /api/v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: method
+  show-actuator: false
+
 logging:
   level:
     root: INFO

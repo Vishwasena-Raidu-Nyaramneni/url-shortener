@@ -85,6 +85,58 @@ This directory contains detailed scenarios demonstrating development patterns, d
 
 ---
 
+### 3. Ambiguous Scenario — Analytics Requirements (`ambiguous.md`)
+
+**Purpose:** Demonstrates how a professional engineer handles intentionally vague requirements instead of making arbitrary implementation decisions.
+
+**Scenario:**
+"Add analytics to the URL shortener." (Deliberately ambiguous)
+
+**What It Covers:**
+- How to identify ambiguities in vague requirements (9 identified)
+- Clarifying questions framework (10 prioritized questions)
+- Multiple interpretation options (4 alternatives: A-D)
+- MVP selection with rationale (Interpretation B)
+- Normalized requirement specification (executable)
+- Acceptance criteria framework (24 testable conditions)
+- Implementation validation (all tests passing)
+- Risk and trade-off analysis (6 risks documented)
+- Future enhancement roadmap (10 Phase 2/3 items)
+
+**Key Sections:**
+1. **Ambiguity Identification** — 9 undefined aspects
+2. **Clarifying Questions** — Prioritized by impact (Tier 1-3)
+3. **Four Interpretations** — Options A-D with pros/cons
+4. **MVP Decision** — Why Interpretation B selected + rationale
+5. **Normalized Requirement** — Concrete specification
+6. **Acceptance Criteria** — AC-001 through AC-024
+7. **Implementation** — Actual code from project
+8. **Validation** — Test results (TC-083 through TC-086)
+9. **Risk Analysis** — 6 risks with mitigation
+10. **Future Enhancements** — Phase 2 (5 items) + Phase 3 (5 items)
+11. **Lessons Learned** — Engineering insights
+12. **Decision Process** — Step-by-step workflow
+
+**Audience:**
+- Engineers learning ambiguity resolution patterns
+- Interviewers evaluating engineering judgment (vs. arbitrary implementation)
+- Product managers understanding requirement clarity importance
+- AI/human collaboration practitioners
+- Interview preparation (demonstrates thinking, not coding speed)
+
+**Key Outcomes Documented:**
+- ✅ 9 ambiguities identified and documented
+- ✅ 10 clarifying questions with impact tiers
+- ✅ 4 interpretation options compared
+- ✅ MVP selected with clear rationale (not guessed)
+- ✅ 24 acceptance criteria (all passing)
+- ✅ Implementation validated (TC-083 through TC-086: PASS)
+- ✅ 6 risks documented with mitigation
+- ✅ 10 future enhancements planned
+- 📊 Demonstrates professional decision-making process
+
+---
+
 ## How to Use These Scenarios
 
 ### For Greenfield Projects
@@ -104,7 +156,8 @@ Read **brownfield.md** to understand:
 
 ### For Interview Preparation
 **Greenfield scenario:** Demonstrates full project lifecycle and engineering judgment  
-**Brownfield scenario:** Demonstrates systems thinking and architectural decision-making
+**Brownfield scenario:** Demonstrates systems thinking and architectural decision-making  
+**Ambiguous scenario:** Demonstrates handling vague requirements (critical skill)
 
 Read **greenfield.md** for:
 - Requirements decomposition and ambiguity resolution
@@ -116,6 +169,13 @@ Read **brownfield.md** for:
 - "How would you scale this system?"
 - "What are the tradeoffs between option X, Y, Z?"
 - "When should you use caching vs. database optimization?"
+
+Read **ambiguous.md** for:
+- "How do you handle vague requirements like 'add analytics'?"
+- "What questions would you ask before implementing?"
+- "How do you balance MVP scope vs. over-engineering?"
+- "How do you document assumptions and trade-offs?"
+- **Differentiator:** Shows thinking process, not just coding ability
 
 ### For Project Planning
 Use these sections as templates:
@@ -162,11 +222,20 @@ Use **brownfield.md** as a scaling decision template:
 
 ## Key Decisions Documented
 
+**Key Decisions Documented**
+
 **Short-Code Design:**
 - Length: 8 characters Base62 (a-z, A-Z, 0-9)
 - Combinations: 218 trillion (62^8)
 - Collision handling: 5-retry mechanism with database unique constraint
 - Rationale: Balance between memorability and uniqueness
+
+**Analytics Scope (Ambiguous Scenario Decision):**
+- MVP selected: Track total clicks + unique visitors + last clicked time
+- Privacy: SHA-256 IP hashing (one-way, GDPR-compliant)
+- API: GET /api/v1/urls/{id}/analytics returns aggregate metrics
+- Rationale: Minimal complexity, enables common use case, clear Phase 2 roadmap
+- Not selected: Real-time dashboards (over-engineered), detailed time-series (premature)
 
 **Architecture:**
 - Pattern: Modular monolith with layered design
@@ -185,6 +254,7 @@ Use **brownfield.md** as a scaling decision template:
 - Connection pooling: HikariCP with 10 connections
 - Error recovery: Proper exception handling with HTTP status mapping
 - Data persistence: Named volumes, survives restart
+
 
 ---
 
